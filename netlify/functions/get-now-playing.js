@@ -1,6 +1,6 @@
-const axios = require('axios');
+import axios from 'axios';
 
-exports.handler = async function (event, context) {
+export async function handler(event, context) {
     const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
 
     // 1. Check Configuration
@@ -56,13 +56,14 @@ exports.handler = async function (event, context) {
 
     } catch (error) {
         console.error("Backend Error:", error.message);
-        console.error("Details:", error.response?.data);
+        const details = error.response ? error.response.data : error.message;
 
         return {
-            statusCode: 500,
+            statusCode: 200, // Return 200 with error details so frontend doesn't see 502
             body: JSON.stringify({
+                is_playing: false,
                 error: "Failed to fetch data",
-                details: error.response?.data || error.message
+                details: details
             }),
         };
     }
