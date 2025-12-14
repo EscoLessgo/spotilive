@@ -1,139 +1,167 @@
-import React, { useState, useEffect, useRef } from 'react';
-import SpotifyWebApi from 'spotify-web-api-js';
-import Login from './Login';
+import React, { useState, useEffect } from 'react';
 import Controls from './Controls';
 import Visualizer from './Visualizer';
 
-const spotifyApi = new SpotifyWebApi();
+// --- SETUP COMPONENT ---
+function SetupMode() {
+  const [step, setStep] = useState(1);
+  const [clientId, setClientId] = useState(localStorage.getItem('temp_cid') || '');
+  const [clientSecret, setClientSecret] = useState(localStorage.getItem('temp_sec') || '');
+  const [refreshToken, setRefreshToken] = useState('');
 
-function App() {
-  const [token, setToken] = useState(null);
-  const [track, setTrack] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [beat, setBeat] = useState(false); // For visualizer pulse
-
-  // 1. Auth Handling
+  // Auto-detect code from URL
   useEffect(() => {
-    const hash = window.location.hash;
-    let _token = window.localStorage.getItem("spotify_token");
-
-    if (!_token && hash) {
-      const tokenParam = hash.substring(1).split("&").find(elem => elem.startsWith("access_token"));
-      if (tokenParam) {
-        _token = tokenParam.split("=")[1];
-        window.location.hash = "";
-        window.localStorage.setItem("spotify_token", _token);
-      }
-    }
-
-    if (_token) {
-      setToken(_token);
-      spotifyApi.setAccessToken(_token);
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code && clientId && clientSecret) {
+      setStep(3); // Processing
+      exchange(code);
     }
   }, []);
 
-  // 2. Polling for State
-  useEffect(() => {
-    if (!token) return;
+  const exchange = async (code) => {
+    try {
+      const redirectUri = window.location.origin; // Using root as redirect
+      const res = await fetch('/.netlify/functions/exchange-token', {
+        method: 'POST',
+        body: JSON.stringify({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri })
+      });
+      const data = await res.json();
+      if (data.refresh_token) {
+        setRefreshToken(data.refresh_token);
+        setStep(4); // Success
+      } else {
+        alert("Error getting token: " + JSON.stringify(data));
+        setStep(1);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Network Error. Ensure your Netlify Functions are deployed and running.");
+    }
+  };
 
-    const interval = setInterval(() => {
-      spotifyApi.getMyCurrentPlaybackState()
-        .then((response) => {
-          if (response && response.item) {
-            setTrack(response.item);
-            setIsPlaying(response.is_playing);
-            setProgress(response.progress_ms);
-          } else {
-            // Not playing or private session
-            setIsPlaying(false);
-          }
-        })
-        .catch(err => {
-          if (err.status === 401) {
-            // Token expired
-            setToken(null);
-            window.localStorage.removeItem("spotify_token");
-          }
-          console.error(err);
-        });
-    }, 1000);
+  const startAuth = () => {
+    localStorage.setItem('temp_cid', clientId);
+    localStorage.setItem('temp_sec', clientSecret);
+    const redirectUri = window.location.origin;
+    const scope = 'user-read-playback-state user-read-currently-playing';
+    window.location.href = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${scope}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  };
+
+  if (step === 4) return (
+    <div style={{ ...styles.box, borderColor: '#0f0' }}>
+      <h2>✅ SUCCCESS!</h2>
+      <p>Here is your <b>SPOTIFY_REFRESH_TOKEN</b>:</p>
+      <textarea readOnly value={refreshToken} style={styles.area} onClick={e => e.target.select()} />
+      <p>Copy this into Netlify Environment Variables along with your ID and Secret.</p>
+    </div>
+  );
+
+  if (step === 3) return <div style={styles.box}><h1>🔄 Exchanging Token...</h1></div>;
+
+  return (
+    <div style={styles.box}>
+      <h1>⚙️ ADMIN SETUP</h1>
+      <p>Since Localhost didn't work for you, we will use this HTTPS site generator.</p>
+
+      <label>1. Add this exact URL to Spotify Redirect URIs:</label>
+      <input readOnly value={window.location.origin} style={styles.inputReadOnly} />
+
+      <label>2. Enter Client ID</label>
+      <input value={clientId} onChange={e => setClientId(e.target.value)} style={styles.input} placeholder="Client ID" />
+
+      <label>3. Enter Client Secret</label>
+      <input value={clientSecret} onChange={e => setClientSecret(e.target.value)} style={styles.input} type="password" placeholder="Client Secret" />
+
+      <button onClick={startAuth} style={styles.btn}>AUTHORIZE & GET TOKEN</button>
+    </div>
+  );
+}
+
+// --- MAIN APP ---
+function App() {
+  const [track, setTrack] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [beat, setBeat] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Check for Setup Mode
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('setup') === 'true' || params.get('code')) {
+    return <div style={{ width: '100vw', height: '100vh', background: '#111', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <SetupMode />
+    </div>;
+  }
+
+  // Poll our own backend
+  useEffect(() => {
+    const fetchNowPlaying = async () => {
+      try {
+        const res = await fetch('/.netlify/functions/get-now-playing');
+        if (!res.ok) throw new Error("Backend Error");
+
+        const data = await res.json();
+        // If the backend says "No Refresh Token", we might want to prompt setup, but let's keep it clean
+
+        if (data.is_playing) {
+          setTrack(data.item);
+          setIsPlaying(data.is_playing);
+          setProgress(data.progress_ms);
+        } else {
+          setIsPlaying(false);
+        }
+      } catch (e) {
+        // Silent fail or console log
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNowPlaying(); // Initial
+    const interval = setInterval(fetchNowPlaying, 2000); // Poll every 2s
 
     return () => clearInterval(interval);
-  }, [token]);
+  }, []);
 
-  // 3. Beat Simulation (Visualizer Driver)
-  // Since we can't get real-time audio data easily without playing in-browser,
-  // we simulate a beat based on presence of playback.
   useEffect(() => {
-    if (!isPlaying) {
-      setBeat(false);
-      return;
-    }
-
-    const bpm = 120; // Default assumption
+    if (!isPlaying) { setBeat(false); return; }
+    const bpm = 120;
     const msPerBeat = (60 / bpm) * 1000;
-
-    const beatInterval = setInterval(() => {
-      setBeat(prev => !prev);
-    }, msPerBeat / 2); // Toggle on/off for pulse effect
-
+    const beatInterval = setInterval(() => { setBeat(prev => !prev); }, msPerBeat / 2);
     return () => clearInterval(beatInterval);
   }, [isPlaying]);
 
-
-  // 4. Control Handlers
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      spotifyApi.pause();
-      setIsPlaying(false); // Optimistic update
-    } else {
-      spotifyApi.play();
-      setIsPlaying(true);
-    }
-  };
-
-  const handleNext = () => {
-    spotifyApi.skipToNext();
-    // Optimistic: wait for poll to update track
-  };
-
-  const handlePrev = () => {
-    spotifyApi.skipToPrevious();
-  };
-
-  if (!token) return <Login />;
+  if (loading && !track) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', flexDirection: 'column' }}>
+        <h1>CONNECTING TO NEON GRID...</h1>
+        <p style={{ color: '#555', marginTop: '20px' }}>If this takes too long, add <code>?setup=true</code> to your URL to configure keys.</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-
-      {/* 3D Background */}
       <Visualizer playing={isPlaying} beat={beat} trackId={track?.id} />
-
-      {/* UI Overlay */}
       <Controls
         track={track}
         isPlaying={isPlaying}
         progress={progress}
-        onPlayPause={handlePlayPause}
-        onNext={handleNext}
-        onPrev={handlePrev}
+        onPlayPause={() => { }}
+        onNext={() => { }}
+        onPrev={() => { }}
       />
-
-      {/* Logout / Reset (Hidden or small) */}
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 100 }}>
-        <button
-          onClick={() => {
-            setToken(null);
-            window.localStorage.removeItem("spotify_token");
-          }}
-          style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Logout
-        </button>
-      </div>
     </div>
   );
+}
+
+const styles = {
+  box: { background: '#222', padding: '40px', borderRadius: '10px', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '15px', border: '1px solid #444' },
+  input: { padding: '10px', background: '#333', border: '1px solid #555', color: 'white', borderRadius: '5px' },
+  inputReadOnly: { padding: '10px', background: '#111', border: '1px solid #333', color: '#888', borderRadius: '5px', cursor: 'text' },
+  btn: { padding: '15px', background: '#1db954', color: 'white', border: 'none', borderRadius: '30px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' },
+  area: { height: '100px', background: '#111', color: '#0f0', border: 'none', padding: '10px', fontFamily: 'monospace' }
 }
 
 export default App;

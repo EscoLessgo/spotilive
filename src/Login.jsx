@@ -1,34 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FaSpotify } from 'react-icons/fa';
 
+// --- CONFIGURATION ---
+// It is safe to expose Client ID in a frontend app (Implicit Grant Flow)
+// But NEVER expose your Client Secret.
+const CLIENT_ID = "34266d4cdffa43c196216e2497d7bd8f";
+
 const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
-const REDIRECT_URI = window.location.origin; // Automatically current localhost
 const SCOPES = [
   "user-read-playback-state",
   "user-modify-playback-state",
   "user-read-currently-playing",
-  "streaming", // For web playback SDK if we used it, but good to have
+  "streaming",
 ];
 
 export default function Login() {
-  const [clientId, setClientId] = useState('');
-  // Default to current origin, stripping trailing slash if present for consistency
-  const [redirectUri, setRedirectUri] = useState(window.location.origin.replace(/\/$/, ""));
-
-  useEffect(() => {
-    const stored = localStorage.getItem('spotify_client_id');
-    if (stored) setClientId(stored);
-  }, []);
 
   const handleLogin = () => {
-    if (!clientId) return alert("Please enter a Client ID");
-    localStorage.setItem('spotify_client_id', clientId);
+    // Automatically use the current website address as the Redirect URI
+    // This allows it to work on Localhost AND your Deployment without code changes.
+    const redirectUri = window.location.origin; // e.g., https://your-site.com or http://localhost:5173
 
-    // Ensure accurate matching
-    const scopeParam = SCOPES.join("%20");
-    const authUrl = `${AUTH_ENDPOINT}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopeParam}&response_type=token&show_dialog=true`;
-
-    window.location.href = authUrl;
+    // Redirect to Spotify
+    window.location.href = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${SCOPES.join("%20")}&response_type=token&show_dialog=true`;
   };
 
   return (
@@ -44,63 +38,44 @@ export default function Login() {
     }}>
       <h1 style={{ fontSize: '3rem', textShadow: '2px 2px #ff00de' }}>NEON TUNES</h1>
       <div style={{ background: 'rgba(0,0,0,0.8)', padding: '2rem', borderRadius: '1rem', border: '1px solid #1db954', textAlign: 'center' }}>
-        <FaSpotify size={50} color="#1db954" style={{ marginBottom: '1rem' }} />
+        <FaSpotify size={60} color="#1db954" style={{ marginBottom: '1.5rem' }} />
 
-        <div style={{ textAlign: 'left', marginBottom: '1rem' }}>
-          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '5px' }}>1. Spotify Client ID</label>
-          <input
-            type="text"
-            placeholder="Paste Client ID here"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value.trim())} // Auto-trim whitespace
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: '#333',
-              border: 'none',
-              color: 'white',
-              borderRadius: '4px',
-              marginBottom: '10px'
-            }}
-          />
-
-          <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '5px' }}>2. Redirect URI (Must match Spotify Dashboard EXACTLY)</label>
-          <input
-            type="text"
-            value={redirectUri}
-            readOnly
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: '#222',
-              border: '1px solid #555',
-              color: '#aaa',
-              borderRadius: '4px',
-              marginBottom: '1rem',
-              cursor: 'copy'
-            }}
-            onClick={(e) => { e.target.select(); document.execCommand('copy'); alert('Copied URI! Paste this into Spotify Dashboard.'); }}
-            title="Click to Copy"
-          />
-        </div>
+        <p style={{ marginBottom: '2rem', fontSize: '1.1rem', maxWidth: '400px', lineHeight: '1.6' }}>
+          Ready to sync? <br />
+          Click below to authorize Spotify.
+        </p>
 
         <button
           onClick={handleLogin}
           style={{
-            padding: '10px 20px',
+            padding: '15px 40px',
             background: '#1db954',
             color: 'white',
             border: 'none',
-            borderRadius: '20px',
+            borderRadius: '50px',
             fontWeight: 'bold',
             cursor: 'pointer',
-            fontSize: '1rem',
+            fontSize: '1.2rem',
             textTransform: 'uppercase',
-            width: '100%'
+            letterSpacing: '2px',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            boxShadow: '0 0 20px rgba(29, 185, 84, 0.5)'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.transform = "scale(1.05)";
+            e.target.style.boxShadow = "0 0 30px rgba(29, 185, 84, 0.8)";
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = "scale(1)";
+            e.target.style.boxShadow = "0 0 20px rgba(29, 185, 84, 0.5)";
           }}
         >
-          CONNECT TO THE GRID
+          CONNECT
         </button>
+
+        <p style={{ marginTop: '2rem', color: '#666', fontSize: '0.8rem' }}>
+          Powered by Spotify API
+        </p>
       </div>
     </div>
   );
