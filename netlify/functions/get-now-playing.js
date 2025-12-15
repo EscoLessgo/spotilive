@@ -1,70 +1,66 @@
-import axios from 'axios';
-
 export async function handler(event, context) {
     const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
 
-    // 1. Check Configuration
+    // 1. Basic Config Check
     if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
         console.error("Missing Environment Variables");
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: "Configuration Error. Check Netlify Env Vars." })
+            body: JSON.stringify({ error: "Configuration Error: Missing Env Vars on Netlify" })
         };
     }
 
-    const basic = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
-    const TOKEN_ENDPOINT = `https://accounts.spotify.com/api/token`;
-
     try {
-        // 2. Get Access Token
-        const tokenParams = new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: SPOTIFY_REFRESH_TOKEN,
-        });
-
-        const tokenRes = await axios.post(TOKEN_ENDPOINT, tokenParams.toString(), {
+        // 2. Refresh Token (using native fetch, no axios deps)
+        const basicAuth = btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`);
+        const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
             headers: {
-                Authorization: `Basic ${basic}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Basic ${basicAuth}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
             },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: SPOTIFY_REFRESH_TOKEN
+            })
         });
 
-        const accessToken = tokenRes.data.access_token;
-        if (!accessToken) throw new Error("No access token returned from Spotify");
-
-        // 3. Get Currently Playing
-        const nowPlayingRes = await axios.get("https://api.spotify.com/v1/me/player/currently-playing", {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-            validateStatus: function (status) {
-                return status < 500; // Resolve even if 204 (Not Playing)
-            }
-        });
-
-        if (nowPlayingRes.status === 204 || nowPlayingRes.data === "") {
+        if (!tokenResponse.ok) {
+            const errText = await tokenResponse.text();
+            console.error("Spotify Token Error:", errText);
             return {
-                statusCode: 200,
-                body: JSON.stringify({ is_playing: false }),
+                statusCode: 200, // Return 200 to show error in UI instead of 500 page
+                body: JSON.stringify({ error: "Spotify Auth Failed", details: errText })
             };
         }
 
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        // 3. Get Now Playing
+        const nowPlayingRes = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (nowPlayingRes.status === 204 || nowPlayingRes.status > 299) {
+            // 204 = Not playing anything
+            return {
+                statusCode: 200,
+                body: JSON.stringify({ is_playing: false })
+            };
+        }
+
+        const data = await nowPlayingRes.json();
         return {
             statusCode: 200,
-            body: JSON.stringify(nowPlayingRes.data),
+            body: JSON.stringify(data)
         };
 
     } catch (error) {
-        console.error("Backend Error:", error.message);
-        const details = error.response ? error.response.data : error.message;
-
+        console.error("Handler Crash:", error);
         return {
-            statusCode: 200, // Return 200 with error details so frontend doesn't see 502
-            body: JSON.stringify({
-                is_playing: false,
-                error: "Failed to fetch data",
-                details: details
-            }),
+            statusCode: 200,
+            body: JSON.stringify({ error: "Internal Server Error", details: error.message })
         };
     }
 }
