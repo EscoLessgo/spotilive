@@ -85,6 +85,7 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [beat, setBeat] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Check for Setup Mode
   const params = new URLSearchParams(window.location.search);
@@ -104,15 +105,21 @@ function App() {
         const data = await res.json();
         // If the backend says "No Refresh Token", we might want to prompt setup, but let's keep it clean
 
-        if (data.is_playing) {
+        if (data.error) {
+          setError(data.error);
+          setIsPlaying(false);
+        } else if (data.is_playing) {
           setTrack(data.item);
           setIsPlaying(data.is_playing);
           setProgress(data.progress_ms);
+          setError(null);
         } else {
           setIsPlaying(false);
+          setError(null);
         }
       } catch (e) {
-        // Silent fail or console log
+        console.error(e);
+        setError("Backend Unreachable. If local, use 'netlify dev'.");
       } finally {
         setLoading(false);
       }
@@ -148,6 +155,7 @@ function App() {
         track={track}
         isPlaying={isPlaying}
         progress={progress}
+        error={error}
         onPlayPause={() => { }}
         onNext={() => { }}
         onPrev={() => { }}

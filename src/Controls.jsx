@@ -8,10 +8,26 @@ const formatTime = (ms) => {
     return `${m}:${rs < 10 ? '0' : ''}${rs}`;
 };
 
-export default function Controls({ track, isPlaying, progress, onPlayPause, onNext, onPrev }) {
+export default function Controls({ track, isPlaying, progress, error, onPlayPause, onNext, onPrev }) {
+    if (error) return (
+        <div style={styles.overlay}>
+            <div style={{ ...styles.playerCard, borderColor: 'red', boxShadow: '0 0 30px red' }}>
+                <h2 style={{ color: 'red', margin: 0 }}>⚠️ Error</h2>
+                <p style={{ color: '#fff', marginTop: '10px' }}>{error}</p>
+                {typeof error === 'string' && error.includes("Configuration") && <p style={{ fontSize: '0.8rem', color: '#aaa' }}>Check your Netlify Environment Variables.</p>}
+            </div>
+        </div>
+    );
     if (!track) return (
-        <div style={styles.container}>
-            <h2 style={{ color: '#fff', textShadow: '0 0 10px #fff' }}>Not Playing</h2>
+        <div style={styles.overlay}>
+            <div style={styles.playerCard}>
+                <h2 style={{ color: '#fff', textShadow: '0 0 10px #fff', margin: 0 }}>
+                    {isPlaying === false ? "Not Playing" : "Connecting..."}
+                </h2>
+                <p style={{ color: '#aaa', marginTop: '10px' }}>
+                    {isPlaying === false ? "Play music on Spotify to see visualizer" : "Waiting for data..."}
+                </p>
+            </div>
         </div>
     );
 
