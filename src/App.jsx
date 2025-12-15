@@ -100,10 +100,19 @@ function App() {
     const fetchNowPlaying = async () => {
       try {
         const res = await fetch('/.netlify/functions/get-now-playing');
-        if (!res.ok) throw new Error("Backend Error");
+
+        if (!res.ok) {
+          // Try to read the error body
+          const text = await res.text();
+          throw new Error(`Backend Error (${res.status}): ${text}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Invalid Response: Expected JSON but got " + contentType);
+        }
 
         const data = await res.json();
-        // If the backend says "No Refresh Token", we might want to prompt setup, but let's keep it clean
 
         if (data.error) {
           setError(data.error);
@@ -119,7 +128,7 @@ function App() {
         }
       } catch (e) {
         console.error(e);
-        setError("Backend Unreachable. If local, use 'netlify dev'.");
+        setError(e.message);
       } finally {
         setLoading(false);
       }
