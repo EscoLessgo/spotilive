@@ -6,7 +6,11 @@ exports.handler = async function (event, context) {
 
     if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
         console.log("Missing Env Vars");
-        return { statusCode: 500, body: JSON.stringify({ error: "Missing Env Vars" }) };
+        return {
+            statusCode: 500,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ error: "Missing Env Vars" })
+        };
     }
 
     // Helper to make HTTPS requests
@@ -44,7 +48,11 @@ exports.handler = async function (event, context) {
 
         if (tokenResp.statusCode !== 200) {
             console.log("Token Error:", tokenResp.body);
-            return { statusCode: 200, body: JSON.stringify({ error: "Auth Fail", details: tokenResp.body }) };
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ error: "Auth Fail", details: tokenResp.body })
+            };
         }
 
         const accessToken = JSON.parse(tokenResp.body).access_token;
@@ -58,17 +66,33 @@ exports.handler = async function (event, context) {
         });
 
         if (musicResp.statusCode === 204) {
-            return { statusCode: 200, body: JSON.stringify({ is_playing: false }) };
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_playing: false })
+            };
         }
 
         if (musicResp.statusCode !== 200) {
-            return { statusCode: 200, body: JSON.stringify({ error: "Spotify API Error", details: musicResp.body }) };
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ error: "Spotify API Error", details: musicResp.body })
+            };
         }
 
-        return { statusCode: 200, body: musicResp.body };
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: musicResp.body
+        };
 
     } catch (e) {
         console.error("Crash:", e);
-        return { statusCode: 200, body: JSON.stringify({ error: "Function Crash", details: e.message }) };
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ error: "Function Crash", details: e.message })
+        };
     }
 };
