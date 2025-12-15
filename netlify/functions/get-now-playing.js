@@ -1,66 +1,74 @@
-export async function handler(event, context) {
+const https = require('https');
+const querystring = require('querystring');
+
+exports.handler = async function (event, context) {
     const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
 
-    // 1. Basic Config Check
     if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
-        console.error("Missing Environment Variables");
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Configuration Error: Missing Env Vars on Netlify" })
-        };
+        console.log("Missing Env Vars");
+        return { statusCode: 500, body: JSON.stringify({ error: "Missing Env Vars" }) };
     }
 
+    // Helper to make HTTPS requests
+    const makeRequest = (options, postData = null) => {
+        return new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let body = '';
+                res.on('data', (chunk) => body += chunk);
+                res.on('end', () => resolve({ statusCode: res.statusCode, body, headers: res.headers }));
+            });
+            req.on('error', (e) => reject(e));
+            if (postData) req.write(postData);
+            req.end();
+        });
+    };
+
     try {
-        // 2. Refresh Token (using native fetch, no axios deps)
-        const basicAuth = btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`);
-        const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+        // 1. Get Access Token
+        const basicAuth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+        const postData = querystring.stringify({
+            grant_type: 'refresh_token',
+            refresh_token: SPOTIFY_REFRESH_TOKEN
+        });
+
+        const tokenResp = await makeRequest({
+            hostname: 'accounts.spotify.com',
+            path: '/api/token',
             method: 'POST',
             headers: {
                 'Authorization': `Basic ${basicAuth}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: SPOTIFY_REFRESH_TOKEN
-            })
-        });
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': postData.length
+            }
+        }, postData);
 
-        if (!tokenResponse.ok) {
-            const errText = await tokenResponse.text();
-            console.error("Spotify Token Error:", errText);
-            return {
-                statusCode: 200, // Return 200 to show error in UI instead of 500 page
-                body: JSON.stringify({ error: "Spotify Auth Failed", details: errText })
-            };
+        if (tokenResp.statusCode !== 200) {
+            console.log("Token Error:", tokenResp.body);
+            return { statusCode: 200, body: JSON.stringify({ error: "Auth Fail", details: tokenResp.body }) };
         }
 
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
+        const accessToken = JSON.parse(tokenResp.body).access_token;
 
-        // 3. Get Now Playing
-        const nowPlayingRes = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        // 2. Get Now Playing
+        const musicResp = await makeRequest({
+            hostname: 'api.spotify.com',
+            path: '/v1/me/player/currently-playing',
+            method: 'GET',
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (nowPlayingRes.status === 204 || nowPlayingRes.status > 299) {
-            // 204 = Not playing anything
-            return {
-                statusCode: 200,
-                body: JSON.stringify({ is_playing: false })
-            };
+        if (musicResp.statusCode === 204) {
+            return { statusCode: 200, body: JSON.stringify({ is_playing: false }) };
         }
 
-        const data = await nowPlayingRes.json();
-        return {
-            statusCode: 200,
-            body: JSON.stringify(data)
-        };
+        if (musicResp.statusCode !== 200) {
+            return { statusCode: 200, body: JSON.stringify({ error: "Spotify API Error", details: musicResp.body }) };
+        }
 
-    } catch (error) {
-        console.error("Handler Crash:", error);
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ error: "Internal Server Error", details: error.message })
-        };
+        return { statusCode: 200, body: musicResp.body };
+
+    } catch (e) {
+        console.error("Crash:", e);
+        return { statusCode: 200, body: JSON.stringify({ error: "Function Crash", details: e.message }) };
     }
-}
+};
