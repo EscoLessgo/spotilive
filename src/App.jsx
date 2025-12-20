@@ -24,19 +24,29 @@ function SetupMode() {
       const redirectUri = window.location.origin; // Using root as redirect
       const res = await fetch('/.netlify/functions/exchange-token', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri })
       });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server Error (${res.status}): ${text}`);
+      }
+
       const data = await res.json();
       if (data.refresh_token) {
         setRefreshToken(data.refresh_token);
         setStep(4); // Success
       } else {
-        alert("Error getting token: " + JSON.stringify(data));
+        alert("Error getting token: " + (data.error || JSON.stringify(data)));
         setStep(1);
       }
     } catch (e) {
       console.error(e);
-      alert("Network Error. Ensure your Netlify Functions are deployed and running.");
+      alert(`Network Error: ${e.message}. Ensure your Netlify Functions are deployed and running.`);
     }
   };
 

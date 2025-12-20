@@ -49,7 +49,7 @@ function Grid({ playing, palette }) {
     );
 }
 
-function Terrain({ playing, palette }) {
+function Terrain({ palette }) {
     const mesh = useRef();
     const noise2D = createNoise2D();
 
@@ -105,7 +105,7 @@ export default function Visualizer({ playing, beat, trackId }) {
             {/* Objects */}
             <Sun color={palette.sun} />
             <Grid playing={playing} palette={palette} />
-            <Terrain playing={playing} palette={palette} />
+            <Terrain palette={palette} />
 
             {/* Lighting */}
             <ambientLight intensity={0.2} />
