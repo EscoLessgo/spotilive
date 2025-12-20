@@ -125,7 +125,8 @@ function App() {
         const data = await res.json();
 
         if (data.error) {
-          setError(data.error);
+          const detailStr = data.details ? (typeof data.details === 'string' ? data.details : JSON.stringify(data.details)) : '';
+          setError(`${data.error}${detailStr ? ': ' + detailStr : ''}`);
           setIsPlaying(false);
         } else if (data.is_playing) {
           setTrack(data.item);

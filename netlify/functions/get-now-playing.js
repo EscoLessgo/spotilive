@@ -1,7 +1,9 @@
 export async function handler(event, context) {
-    const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REFRESH_TOKEN } = process.env;
+    const CID = process.env.SPOTIFY_CLIENT_ID?.trim();
+    const SEC = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+    const REF = process.env.SPOTIFY_REFRESH_TOKEN?.trim();
 
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET || !SPOTIFY_REFRESH_TOKEN) {
+    if (!CID || !SEC || !REF) {
         console.error("Missing Env Vars in get-now-playing");
         return {
             statusCode: 500,
@@ -15,10 +17,10 @@ export async function handler(event, context) {
 
     try {
         // 1. Get Access Token (Refresh Flow)
-        const basicAuth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+        const basicAuth = Buffer.from(`${CID}:${SEC}`).toString('base64');
         const tokenParams = new URLSearchParams({
             grant_type: 'refresh_token',
-            refresh_token: SPOTIFY_REFRESH_TOKEN
+            refresh_token: REF
         });
 
         const tokenResp = await fetch('https://accounts.spotify.com/api/token', {
