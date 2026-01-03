@@ -54,7 +54,7 @@ app.all('/.netlify/functions/get-analytics', netlifyAdapter(getAnalyticsHandler)
 app.use(express.static('dist'));
 
 // Handle SPA Routing
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
   if (req.path.startsWith('/.netlify/')) return res.status(404).send('Not Found');
   res.sendFile(path.resolve('dist', 'index.html'));
 });
