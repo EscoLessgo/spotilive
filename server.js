@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
 import { handler as exchangeTokenHandler } from './netlify/functions/exchange-token.js';
 import { handler as getNowPlayingHandler } from './netlify/functions/get-now-playing.js';
 import { handler as trackViewHandler } from './netlify/functions/track-view.js';
@@ -49,6 +50,15 @@ app.all('/.netlify/functions/get-now-playing', netlifyAdapter(getNowPlayingHandl
 app.all('/.netlify/functions/track-view', netlifyAdapter(trackViewHandler));
 app.all('/.netlify/functions/get-analytics', netlifyAdapter(getAnalyticsHandler));
 
+// Serve Static Assets (Production)
+app.use(express.static('dist'));
+
+// Handle SPA Routing
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/.netlify/')) return res.status(404).send('Not Found');
+  res.sendFile(path.resolve('dist', 'index.html'));
+});
+
 app.listen(PORT, () => {
-  console.log(`Local Netlify Functions Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
