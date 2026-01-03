@@ -7,10 +7,19 @@ export default function AdminPanel() {
 
     useEffect(() => {
         fetch('/.netlify/functions/get-analytics')
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                setLogs(data);
+            .then(async res => {
+                const text = await res.text();
+                try {
+                    const data = JSON.parse(text);
+                    if (!res.ok) throw new Error(data.error || text);
+                    if (data.error) throw new Error(data.error);
+                    setLogs(data);
+                } catch (jsonError) {
+                    console.error("JSON Parse Error:", jsonError);
+                    // If JSON fails, it's likely a 500 HTML page or raw text error
+                    const preview = text.substring(0, 200);
+                    throw new Error(`Server Error (${res.status}): ${preview}`);
+                }
                 setLoading(false);
             })
             .catch(err => {
