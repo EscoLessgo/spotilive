@@ -111,7 +111,8 @@ function App() {
 
   // Check for Admin/Setup Mode
   const params = new URLSearchParams(window.location.search);
-  if (params.get('admin') === 'true') {
+  // Allow both ?admin=true AND /admin path (requires SPA redirect in netlify.toml)
+  if (params.get('admin') === 'true' || window.location.pathname === '/admin' || window.location.pathname === '/admin/') {
     return <AdminPanel />;
   }
   // Check for Setup Mode
