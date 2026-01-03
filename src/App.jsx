@@ -61,7 +61,7 @@ function SetupMode() {
 
   if (step === 4) return (
     <div style={{ ...styles.box, borderColor: '#0f0' }}>
-      <h2>✅ SUCCCESS!</h2>
+      <h2>✅ SUCCESS!</h2>
       <p>Here is your <b>SPOTIFY_REFRESH_TOKEN</b>:</p>
       <textarea readOnly value={refreshToken} style={styles.area} onClick={e => e.target.select()} />
       <p>Copy this into your <b>.env</b> file (locally) or Netlify Environment Variables (deployment) along with your ID and Secret.</p>
@@ -136,7 +136,9 @@ function App() {
 
         const contentType = res.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Invalid Response: Expected JSON but got " + contentType);
+          const text = await res.text();
+          console.error("Non-JSON Response:", text.substring(0, 100)); // Log for debug
+          throw new Error("Received HTML/Text instead of JSON. The backend function might have crashed.");
         }
 
         const data = await res.json();
