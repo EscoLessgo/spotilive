@@ -7,6 +7,7 @@
     "dev": "concurrently -n \"API,WEB\" -c \"magenta,cyan\" \"node server.js\" \"vite\"",
     "setup": "node setup.js",
     "build": "vite build",
+    "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

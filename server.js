@@ -9,7 +9,7 @@ import { handler as getAnalyticsHandler } from './netlify/functions/get-analytic
 dotenv.config();
 
 const app = express();
-const PORT = 8888;
+const PORT = process.env.PORT || 8888;
 
 // Middleware to parse JSON bodies (Netlify functions receive event.body as string)
 app.use(express.json());
