@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 export async function handler(event, context) {
     const CID = process.env.SPOTIFY_CLIENT_ID?.trim();
     const SEC = process.env.SPOTIFY_CLIENT_SECRET?.trim();
