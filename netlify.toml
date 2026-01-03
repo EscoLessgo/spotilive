@@ -3,6 +3,11 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["lib/**"]
+  external_node_modules = ["better-sqlite3"] # Exclude if causes issues, though db.js mocks it now.
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

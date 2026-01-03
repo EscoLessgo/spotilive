@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Native fetch is available in Node 18+ (Netlify default)
 
 export async function handler(event, context) {
     const CID = process.env.SPOTIFY_CLIENT_ID?.trim();
@@ -6,45 +6,32 @@ export async function handler(event, context) {
     const REF = process.env.SPOTIFY_REFRESH_TOKEN?.trim();
 
     if (!CID || !SEC || !REF) {
-        console.error("Missing Env Vars in get-now-playing");
         return {
             statusCode: 500,
-            headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            body: JSON.stringify({ error: "Configuration Error: Missing Netlify Environment Variables." })
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: JSON.stringify({ error: "Configuration Error: Missing Env Vars." })
         };
     }
 
     try {
-        // 1. Get Access Token (Refresh Flow)
+        // 1. Get Access Token
         const basicAuth = Buffer.from(`${CID}:${SEC}`).toString('base64');
-        const tokenParams = new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: REF
-        });
-
         const tokenResp = await fetch('https://accounts.spotify.com/api/token', {
             method: 'POST',
             headers: {
                 'Authorization': `Basic ${basicAuth}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: tokenParams.toString()
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: REF }).toString()
         });
 
         const tokenData = await tokenResp.json();
 
         if (!tokenResp.ok) {
-            console.error("Token Refresh Error:", tokenData);
-            // We return 200 with an error object so the frontend can handle it nicely
+            console.error("Token Error:", tokenData);
             return {
                 statusCode: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
                 body: JSON.stringify({ error: "Auth Fail", details: tokenData })
             };
         }
@@ -56,36 +43,31 @@ export async function handler(event, context) {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
-        if (musicResp.statusCode === 204 || musicResp.status === 204) {
+        // Handle 204 No Content (Not playing)
+        if (musicResp.status === 204) {
             return {
                 statusCode: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
                 body: JSON.stringify({ is_playing: false })
             };
         }
 
-        const musicData = await musicResp.json();
-
+        // Handle Errors (Status != 200)
         if (!musicResp.ok) {
+            const errorText = await musicResp.text(); // Read as text first to avoid crash
             return {
                 statusCode: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
-                body: JSON.stringify({ error: "Spotify API Error", details: musicData })
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: JSON.stringify({ error: "Spotify API Error", status: musicResp.status, details: errorText })
             };
         }
 
+        // Parse JSON only if OK and not empty
+        const musicData = await musicResp.json();
+
         return {
             statusCode: 200,
-            headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             body: JSON.stringify(musicData)
         };
 
