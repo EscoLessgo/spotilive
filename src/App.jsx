@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Controls from './Controls';
 import Visualizer from './Visualizer';
+import AdminPanel from './Admin';
 
 // --- SETUP COMPONENT ---
 function SetupMode() {
@@ -63,7 +64,7 @@ function SetupMode() {
       <h2>✅ SUCCCESS!</h2>
       <p>Here is your <b>SPOTIFY_REFRESH_TOKEN</b>:</p>
       <textarea readOnly value={refreshToken} style={styles.area} onClick={e => e.target.select()} />
-      <p>Copy this into Netlify Environment Variables along with your ID and Secret.</p>
+      <p>Copy this into your <b>.env</b> file (locally) or Netlify Environment Variables (deployment) along with your ID and Secret.</p>
     </div>
   );
 
@@ -97,8 +98,23 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check for Setup Mode
+  // Analytics Tracking
+  useEffect(() => {
+    // Don't track if in admin mode to keep data clean
+    if (new URLSearchParams(window.location.search).get('admin') === 'true') return;
+
+    fetch('/.netlify/functions/track-view', {
+      method: 'POST',
+      body: JSON.stringify({ path: window.location.pathname })
+    }).catch(e => console.error("Tracking error:", e));
+  }, []);
+
+  // Check for Admin/Setup Mode
   const params = new URLSearchParams(window.location.search);
+  if (params.get('admin') === 'true') {
+    return <AdminPanel />;
+  }
+  // Check for Setup Mode
   if (params.get('setup') === 'true' || params.get('code')) {
     return <div style={{ width: '100vw', height: '100vh', background: '#111', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <SetupMode />
